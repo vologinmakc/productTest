@@ -1,0 +1,75 @@
+version: '3'
+
+services:
+  php:
+    container_name: product-php
+    build:
+      context: ./docker/config/php
+      dockerfile: Dockerfile
+    depends_on:
+      - postgres
+    volumes:
+      - ${PROJECT_VOLUME}:/application
+      - ${SPA_VOLUME}:/spa
+      - ./docker/config/php/php.ini:/usr/local/etc/php/conf.d/custom.ini
+    ports:
+      - ${PHP_PORT}:8080
+    user: '${UID}'
+    networks:
+      - product_network
+
+  postgres:
+    container_name: product-postgres
+    image: postgres:9.6-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
+    volumes:
+      - ${POSTGRES_VOLUME}:/var/lib/postgresql/data
+    ports:
+      - ${POSTGRES_PORT}:5432
+    networks:
+      - product_network
+
+  nginx:
+    container_name: product-nginx
+    image: nginx:alpine
+    ports:
+      - ${NGINX_API}:8000
+      - ${NGINX_FRONT}:8001
+    volumes:
+      - ./docker/server/nginx/:/var/log/nginx
+      - ./docker/config/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/config/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ${PROJECT_VOLUME}:/application
+      - ${SPA_VOLUME}:/spa
+    depends_on:
+      - php
+    networks:
+      - product_network
+
+  redis:
+    container_name: product-redis
+    image: redis:6.2.5-alpine
+    ports:
+      - '6389:6379'
+    command:
+      - 'redis-server'
+      - '--databases 2'
+      - '--save 900 1'
+      - '--save 300 10'
+      - '--save 60 10000'
+    volumes:
+      - ${REDIS_VOLUME}:/data
+    networks:
+      - product_network
+
+
+volumes:
+  pg_volume:
+    external: true
+
+networks:
+  product_network:
+    driver: bridge
